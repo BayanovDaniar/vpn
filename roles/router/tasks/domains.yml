@@ -1,0 +1,83 @@
+---
+# Domains configuration tasks
+# Uses vpn_* variables from all.yml
+
+- name: Ensure dnsmasq.d directory exists
+  ansible.builtin.file:
+    path: /etc/dnsmasq.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Upload IPv4 domain lists
+  ansible.builtin.copy:
+    src: "ipv4/{{ item }}.lst"
+    dest: "/etc/dnsmasq.d/{{ item }}-ipv4.lst"
+    owner: root
+    group: root
+    mode: "0644"
+    backup: false
+  loop: "{{ vpn_domains_lists }}"
+  loop_control:
+    label: "{{ item }}"
+  when:
+    - item not in vpn_services_exclude
+    - vpn_domains[item] | default(false)
+  notify: Rebuild domains
+
+- name: Upload IPv6 domain lists
+  ansible.builtin.copy:
+    src: "ipv6/{{ item }}.lst"
+    dest: "/etc/dnsmasq.d/{{ item }}-ipv6.lst"
+    owner: root
+    group: root
+    mode: "0644"
+    backup: false
+  loop: "{{ vpn_domains_lists }}"
+  loop_control:
+    label: "{{ item }}"
+  when:
+    - vpn_ipv6_enabled | default(false)
+    - item not in vpn_services_exclude
+    - vpn_domains[item] | default(false)
+  notify: Rebuild domains
+
+- name: Remove disabled IPv4 domain lists
+  ansible.builtin.file:
+    path: "/etc/dnsmasq.d/{{ item }}-ipv4.lst"
+    state: absent
+  loop: "{{ vpn_domains_lists }}"
+  loop_control:
+    label: "{{ item }}"
+  when:
+    - item in vpn_services_exclude or not (vpn_domains[item] | default(false))
+  notify: Rebuild domains
+
+- name: Remove disabled IPv6 domain lists
+  ansible.builtin.file:
+    path: "/etc/dnsmasq.d/{{ item }}-ipv6.lst"
+    state: absent
+  loop: "{{ vpn_domains_lists }}"
+  loop_control:
+    label: "{{ item }}"
+  when:
+    - not (vpn_ipv6_enabled | default(false))
+      or item in vpn_services_exclude
+      or not (vpn_domains[item] | default(false))
+  notify: Rebuild domains
+
+- name: Deploy getdomains script
+  ansible.builtin.template:
+    src: getdomains.sh.j2
+    dest: /etc/init.d/getdomains
+    owner: root
+    group: root
+    mode: "0755"
+    backup: false
+  notify: Rebuild domains
+
+- name: Enable getdomains autostart
+  ansible.builtin.command:
+    cmd: /etc/init.d/getdomains enable
+  changed_when: false

@@ -1,0 +1,14 @@
+---
+# Handlers for vpn role
+
+- name: Restart x-ui
+  ansible.builtin.service:
+    name: x-ui
+    state: restarted
+  listen: restart x-ui
+
+- name: Reload sshd
+  ansible.builtin.service:
+    name: sshd
+    state: reloaded
+  listen: reload sshd

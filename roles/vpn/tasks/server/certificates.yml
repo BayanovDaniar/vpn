@@ -1,0 +1,103 @@
+---
+# VPN Server Role - Let's Encrypt Certificates via acme.sh
+
+# --- Install acme.sh ---
+- name: Check if acme.sh is installed
+  ansible.builtin.stat:
+    path: "{{ vpn_server_acme_home }}/acme.sh"
+  register: vpn_acme_installed
+  tags: [acme, acme-install]
+
+- name: Install required packages for acme.sh
+  ansible.builtin.apt:
+    name:
+      - git
+      - socat
+    state: present
+    update_cache: true
+  tags: [acme, acme-install]
+
+- name: Clone acme.sh repository
+  ansible.builtin.git:
+    repo: https://github.com/acmesh-official/acme.sh.git
+    dest: /tmp/acme.sh
+    depth: 1
+  when: not vpn_acme_installed.stat.exists
+  tags: [acme, acme-install]
+
+- name: Install acme.sh
+  ansible.builtin.command:
+    cmd: ./acme.sh --install --home {{ vpn_server_acme_home }} --accountemail {{ vpn_server_acme_email }}
+    chdir: /tmp/acme.sh
+    creates: "{{ vpn_server_acme_home }}/acme.sh"
+  when: not vpn_acme_installed.stat.exists
+  tags: [acme, acme-install]
+
+- name: Clean up acme.sh clone
+  ansible.builtin.file:
+    path: /tmp/acme.sh
+    state: absent
+  tags: [acme, acme-install]
+
+# --- Issue certificate ---
+- name: Stop x-ui temporarily for certificate issuance
+  ansible.builtin.systemd:
+    name: x-ui
+    state: stopped
+  when: vpn_server_domain is defined
+  tags: [acme, acme-issue]
+
+- name: Issue certificate via standalone mode
+  ansible.builtin.command:
+    cmd: >
+      {{ vpn_server_acme_home }}/acme.sh --issue
+      -d {{ vpn_server_domain }}
+      --standalone
+      --keylength ec-256
+  register: vpn_cert_issued
+  changed_when: "'Cert success' in vpn_cert_issued.stdout"
+  failed_when: vpn_cert_issued.rc != 0 and 'Domains not changed' not in vpn_cert_issued.stdout
+  when: vpn_server_domain is defined
+  tags: [acme, acme-issue]
+
+- name: Install certificate to x-ui directory
+  ansible.builtin.command:
+    cmd: >
+      {{ vpn_server_acme_home }}/acme.sh --install-cert -d {{ vpn_server_domain }} --ecc
+      --cert-file {{ vpn_server_xui_cert_path }}
+      --key-file {{ vpn_server_xui_key_path }}
+      --reloadcmd "systemctl restart x-ui"
+  when: vpn_server_domain is defined
+  notify: restart x-ui
+  tags: [acme, acme-issue, acme-install-cert]
+
+- name: Start x-ui after certificate installation
+  ansible.builtin.systemd:
+    name: x-ui
+    state: started
+  when: vpn_server_domain is defined
+  tags: [acme, acme-issue]
+
+# --- Renew certificates ---
+- name: Force renew certificate
+  ansible.builtin.command:
+    cmd: >
+      {{ vpn_server_acme_home }}/acme.sh --renew
+      -d {{ vpn_server_domain }}
+      --ecc
+      --force
+  register: vpn_cert_renewed
+  changed_when: "'Cert success' in vpn_cert_renewed.stdout"
+  failed_when: false
+  when: vpn_server_domain is defined
+  tags: [acme-renew, never]
+
+# --- Auto-renew cron ---
+- name: Ensure acme.sh cron for auto-renewal
+  ansible.builtin.cron:
+    name: "acme.sh renew"
+    minute: "0"
+    hour: "2"
+    job: "{{ vpn_server_acme_home }}/acme.sh --cron --home {{ vpn_server_acme_home }} > /dev/null 2>&1"
+    user: root
+  tags: [acme, acme-cron]

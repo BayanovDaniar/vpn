@@ -1,0 +1,11 @@
+---
+# =============================================================================
+# Router (OpenWrt) Configuration
+# =============================================================================
+
+# VPN client name
+vpn_client_name: router
+
+# WiFi SSID
+router_wifi_ssid_2g: "OpenWRT_333_2G"
+router_wifi_ssid_5g: "OpenWRT_333_5G"

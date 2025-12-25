@@ -1,0 +1,53 @@
+---
+# PAC file generation
+
+- name: Initialize PAC domains
+  ansible.builtin.set_fact:
+    pac_domains: "{{ vpn_routing_domains }}"
+    _pac_external_domains: []
+
+- name: Download external domain lists
+  ansible.builtin.get_url:
+    url: "{{ item }}"
+    dest: "{{ vpn_local_config_dir }}/pac_external_{{ item | hash('md5') | truncate(8, True, '') }}.tmp"
+    mode: "0644"
+    validate_certs: "{{ vpn_local_pac_validate_certs }}"
+    timeout: 30
+    force: true
+  loop: "{{ vpn_extra_sources }}"
+  loop_control:
+    label: "{{ item | urlsplit('path') | basename }}"
+  register: _pac_downloads
+  when: vpn_extra_sources | length > 0
+
+- name: Parse downloaded domain lists
+  ansible.builtin.set_fact:
+    _pac_external_domains: >-
+      {{
+        _pac_external_domains +
+        (lookup('file', item.dest, errors='ignore') | default('') | regex_findall('(?:ipset|nftset)=/\.?([^/]+)/[^/\n]*'))
+      }}
+  loop: "{{ _pac_downloads.results | default([]) | selectattr('dest', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.dest | basename }}"
+  when: not ansible_check_mode
+
+- name: Merge external domains
+  ansible.builtin.set_fact:
+    pac_domains: "{{ (pac_domains + _pac_external_domains) | unique | sort }}"
+  when: _pac_external_domains | length > 0
+
+- name: Generate PAC file
+  ansible.builtin.template:
+    src: proxy.pac.j2
+    dest: "{{ vpn_local_config_dir }}/proxy.pac"
+    mode: "0644"
+
+- name: Cleanup temp files
+  ansible.builtin.file:
+    path: "{{ item.dest }}"
+    state: absent
+  loop: "{{ _pac_downloads.results | default([]) | selectattr('dest', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.dest | basename }}"
+  changed_when: false

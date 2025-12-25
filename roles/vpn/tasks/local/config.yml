@@ -1,0 +1,28 @@
+---
+# sing-box configuration for macOS
+
+- name: Generate sing-box configuration
+  ansible.builtin.template:
+    src: config.json.j2
+    dest: "{{ vpn_local_config_dir }}/config.json"
+    mode: "0600"
+    backup: true
+
+- name: Install sing-box via Homebrew
+  community.general.homebrew:
+    name: sing-box
+    state: present
+
+- name: Validate sing-box configuration
+  ansible.builtin.command:
+    cmd: /opt/homebrew/bin/sing-box check -c "{{ vpn_local_config_dir }}/config.json"
+  changed_when: false
+
+- name: Create run script
+  ansible.builtin.copy:
+    dest: "{{ vpn_local_config_dir }}/run-sing-box.sh"
+    mode: "0755"
+    content: |
+      #!/bin/bash
+      set -e
+      exec /opt/homebrew/bin/sing-box run -c "{{ vpn_local_config_dir }}/config.json"

@@ -1,0 +1,112 @@
+---
+# =============================================================================
+# VPN Role - Default Variables
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Core Settings
+# -----------------------------------------------------------------------------
+
+vpn_ipv6_enabled: true
+vpn_log_level: info
+
+# -----------------------------------------------------------------------------
+# Domain Lists
+# -----------------------------------------------------------------------------
+
+vpn_domains_lists:
+  - antigravity
+  - claude
+  - copilot
+  - datadog
+  - google
+  - instagram
+  - linkedin
+  - netflix
+  - openai
+  - telegram
+  - windsurf
+  - x
+
+vpn_services_exclude: []
+
+vpn_domains:
+  antigravity: true
+  claude: true
+  copilot: true
+  datadog: true
+  google: true
+  instagram: true
+  linkedin: true
+  netflix: true
+  openai: true
+  telegram: false
+  windsurf: true
+  x: true
+
+# External domain sources (ipset/nftset format)
+vpn_extra_sources:
+  - "https://raw.githubusercontent.com/itdoginfo/allow-domains/main/Russia/inside-dnsmasq-ipset.lst"
+
+# -----------------------------------------------------------------------------
+# VPN Servers (REQUIRED in group_vars)
+# -----------------------------------------------------------------------------
+
+vpn_servers: []
+
+# -----------------------------------------------------------------------------
+# VLESS Outbound Common Settings
+# -----------------------------------------------------------------------------
+
+vpn_outbound_common:
+  tag: vpn-out
+  type: vless
+  server_port: 8443
+  flow: xtls-rprx-vision
+  tls:
+    enabled: true
+    insecure: false
+    server_name: yandex.com
+    disable_sni: false
+  utls:
+    enabled: true
+    fingerprint: chrome
+  reality:
+    enabled: true
+
+# -----------------------------------------------------------------------------
+# DNS Servers
+# -----------------------------------------------------------------------------
+
+vpn_dns_servers:
+  - tag: bootstrap
+    type: udp
+    server: "8.8.8.8"
+  - tag: google-doh
+    type: https
+    server: dns.google
+    server_port: 443
+    domain_resolver: bootstrap
+
+# -----------------------------------------------------------------------------
+# Local (Mac) Specific Settings
+# -----------------------------------------------------------------------------
+
+vpn_local_config_dir: "{{ ansible_facts['env']['HOME'] | default('/tmp') }}/.config/sing-box"
+vpn_local_proxy_port: 2080
+vpn_local_pac_enabled: true
+vpn_local_pac_validate_certs: false
+
+# -----------------------------------------------------------------------------
+# Server Specific Settings
+# -----------------------------------------------------------------------------
+
+vpn_server_acme_email: ""
+vpn_server_xui_port: 443
+vpn_server_vless_port: 8443
+vpn_server_ssh_port: 22
+vpn_server_ssh_permit_root: "prohibit-password"
+vpn_server_ssh_password_auth: false
+vpn_server_acme_home: "/root/.acme.sh"
+vpn_server_xui_cert_path: "/etc/x-ui/certificate.crt"
+vpn_server_xui_key_path: "/etc/x-ui/certificate.key"

@@ -1,0 +1,29 @@
+---
+# Добавляем VPN серверы из vault_vpn_servers динамически
+- name: Build VPN servers inventory
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Add VPN servers to inventory
+      ansible.builtin.add_host:
+        name: "{{ item.name }}"
+        ansible_host: "{{ item.server_ipv4 }}"
+        ansible_user: root
+        groups: vpn_servers
+        server_ipv4: "{{ item.server_ipv4 }}"
+        server_ipv6: "{{ item.server_ipv6 | default('') }}"
+        public_key: "{{ item.public_key }}"
+        short_id: "{{ item.short_id }}"
+        clients: "{{ item.clients }}"
+      loop: "{{ vault_vpn_servers }}"
+      loop_control:
+        label: "{{ item.name }}"
+      tags: [always]
+
+- name: Configure VPN servers
+  hosts: vpn_servers
+  become: true
+  gather_facts: true
+  roles:
+    - role: vpn
+      tags: [server]

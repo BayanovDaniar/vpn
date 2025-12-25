@@ -1,0 +1,161 @@
+---
+# =============================================================================
+# Router Role - Default Variables (OpenWrt specific)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# VPN Domain Configuration (Russia profile)
+# -----------------------------------------------------------------------------
+
+vpn_ipv6_enabled: true
+
+vpn_domains_lists:
+  - antigravity
+  - claude
+  - copilot
+  - datadog
+  - google
+  - instagram
+  - linkedin
+  - netflix
+  - openai
+  - telegram
+  - windsurf
+  - x
+
+vpn_services_exclude: []
+
+vpn_domains:
+  antigravity: true
+  claude: true
+  copilot: true
+  datadog: true
+  google: true
+  instagram: true
+  linkedin: true
+  netflix: true
+  openai: true
+  telegram: false
+  windsurf: true
+  x: true
+
+vpn_outbound_common:
+  tag: vpn-out
+  type: vless
+  server_port: 8443
+  flow: xtls-rprx-vision
+  tls:
+    enabled: true
+    insecure: false
+    server_name: yandex.com
+    disable_sni: false
+  utls:
+    enabled: true
+    fingerprint: chrome
+  reality:
+    enabled: true
+
+# -----------------------------------------------------------------------------
+# System Configuration
+# -----------------------------------------------------------------------------
+
+router_network_lan_ipaddr: "192.168.1.1"
+router_network_lan_netmask: "255.255.255.0"
+router_network_wan_proto: "dhcp"
+router_network_wan_mac: ""
+
+# -----------------------------------------------------------------------------
+# VPN Configuration
+# -----------------------------------------------------------------------------
+
+router_vpn_enabled: true
+
+# -----------------------------------------------------------------------------
+# Proxy Configuration
+# -----------------------------------------------------------------------------
+
+router_proxy_enabled: true
+router_proxy_port: 2080
+
+# 2G Network without VPN (not implemented)
+router_2g_without_vpn: false
+
+# -----------------------------------------------------------------------------
+# Performance
+# -----------------------------------------------------------------------------
+
+router_packet_steering: true
+router_flow_offloading: true
+router_hw_offloading: true
+
+router_sysctl_enabled: true
+router_sysctl_rmem_max: 16777216
+router_sysctl_wmem_max: 16777216
+router_sysctl_rmem_default: 1048576
+router_sysctl_wmem_default: 1048576
+router_sysctl_tcp_rmem: "4096 1048576 16777216"
+router_sysctl_tcp_wmem: "4096 1048576 16777216"
+router_sysctl_netdev_max_backlog: 5000
+router_sysctl_mtu_probing: 1
+
+router_irqbalance_enabled: true
+
+# -----------------------------------------------------------------------------
+# sing-box Configuration
+# -----------------------------------------------------------------------------
+
+router_singbox_log_level: error
+
+router_singbox_dns_servers:
+  - address: "tls://8.8.8.8"
+    tag: "google-dns"
+  - address: "tls://1.1.1.1"
+    tag: "cloudflare-dns"
+
+router_singbox_inbound:
+  interface_name: tun0
+  address: ["172.16.250.1/30"]
+  domain_strategy: ipv4_only
+  mtu: 9000
+  auto_route: false
+  strict_route: false
+  sniff: true
+  stack: system
+  endpoint_independent_nat: false
+  udp_timeout: "5m"
+
+router_singbox_route:
+  auto_detect_interface: true
+
+# -----------------------------------------------------------------------------
+# WiFi Configuration (defaults)
+# -----------------------------------------------------------------------------
+
+router_wifi_devices:
+  - index: 0
+    enabled: true
+  - index: 1
+    enabled: true
+
+router_wifi_ssid_2g: "OpenWRT_2G"
+router_wifi_ssid_5g: "OpenWRT_5G"
+
+router_wifi_ifaces:
+  - index: 0
+    enabled: true
+    options:
+      - option: ssid
+        value: "{{ router_wifi_ssid_2g }}"
+      - option: encryption
+        value: "psk2+sae"
+      - option: key
+        value: "{{ vault_wifi_password }}"
+  - index: 1
+    enabled: true
+    options:
+      - option: ssid
+        value: "{{ router_wifi_ssid_5g }}"
+      - option: encryption
+        value: "psk2+sae"
+      - option: key
+        value: "{{ vault_wifi_password }}"

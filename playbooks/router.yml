@@ -1,0 +1,7 @@
+---
+- name: Configure OpenWrt router
+  hosts: router
+  gather_facts: true
+  remote_user: root
+  roles:
+    - role: router

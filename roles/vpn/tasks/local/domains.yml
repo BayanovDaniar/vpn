@@ -1,0 +1,48 @@
+---
+# Parse domain lists from router role files
+
+- name: Build enabled domains list
+  ansible.builtin.set_fact:
+    _enabled_domains: >-
+      {{ vpn_domains_lists | select('in', vpn_domains | dict2items | selectattr('value', 'equalto', true) | map(attribute='key') | list) | list }}
+
+- name: Initialize domains collection
+  ansible.builtin.set_fact:
+    vpn_routing_domains: []
+
+- name: Read and parse IPv4 domain lists
+  ansible.builtin.set_fact:
+    vpn_routing_domains: >-
+      {{
+        vpn_routing_domains +
+        (lookup('file', playbook_dir + '/../roles/router/files/ipv4/' + item + '.lst', errors='ignore') | default(''))
+        | regex_findall('nftset=/\.?([^/]+)/4#')
+        | reject('search', '^(' + (vpn_services_exclude | join('|')) + ')')
+        | list
+      }}
+  loop: "{{ _enabled_domains }}"
+  loop_control:
+    label: "{{ item }}.lst"
+
+- name: Read and parse IPv6 domain lists
+  ansible.builtin.set_fact:
+    vpn_routing_domains: >-
+      {{
+        vpn_routing_domains +
+        (lookup('file', playbook_dir + '/../roles/router/files/ipv6/' + item + '.lst', errors='ignore') | default(''))
+        | regex_findall('nftset=/\.?([^/]+)/6#')
+        | reject('search', '^(' + (vpn_services_exclude | join('|')) + ')')
+        | list
+      }}
+  loop: "{{ _enabled_domains }}"
+  loop_control:
+    label: "{{ item }}.lst (IPv6)"
+  when: vpn_ipv6_enabled | default(false)
+
+- name: Deduplicate and sort domain list
+  ansible.builtin.set_fact:
+    vpn_routing_domains: "{{ vpn_routing_domains | unique | sort }}"
+
+- name: Report domain count
+  ansible.builtin.debug:
+    msg: "Loaded {{ vpn_routing_domains | length }} unique domains from {{ _enabled_domains | length }} lists"

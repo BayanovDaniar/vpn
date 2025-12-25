@@ -1,0 +1,110 @@
+{# {{ ansible_managed }} #}
+{
+  "log": {
+    "level": "{{ vpn_log_level }}",
+    "timestamp": true
+  },
+  "dns": {
+    "servers": [
+{% for dns in vpn_dns_servers %}
+      {
+        "tag": "{{ dns.tag }}",
+{% if dns.type == 'udp' %}
+        "type": "udp",
+        "server": "{{ dns.server }}"
+{% elif dns.type == 'https' %}
+        "type": "https",
+        "server": "{{ dns.server }}",
+        "server_port": {{ dns.server_port }},
+        "domain_resolver": "{{ dns.domain_resolver }}"
+{% endif %}
+      }{% if not loop.last %},{% endif %}
+
+{% endfor %}
+    ],
+    "strategy": "{% if vpn_ipv6_enabled %}prefer_ipv4{% else %}ipv4_only{% endif %}",
+    "final": "{{ vpn_dns_servers[-1].tag }}"
+  },
+  "inbounds": [
+    {
+      "type": "mixed",
+      "tag": "mixed-in",
+      "listen": "127.0.0.1",
+      "listen_port": {{ vpn_local_proxy_port }},
+      "sniff": true,
+      "sniff_override_destination": true
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "{{ vpn_outbound_common.tag }}",
+      "type": "urltest",
+      "outbounds": [
+{% for server in vpn_servers %}
+        "{{ server.name }}-v4"{% if vpn_ipv6_enabled and server.server_ipv6 %},
+        "{{ server.name }}-v6"{% endif %}{% if not loop.last %},{% endif %}
+
+{% endfor %}
+      ],
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": "5m",
+      "tolerance": 50
+    },
+{% for server in vpn_servers %}
+    {
+      "tag": "{{ server.name }}-v4",
+      "type": "{{ vpn_outbound_common.type }}",
+      "server": "{{ server.server_ipv4 }}",
+      "server_port": {{ vpn_outbound_common.server_port }},
+      "uuid": "{{ server.uuid }}"{% if vpn_outbound_common.flow %},
+      "flow": "{{ vpn_outbound_common.flow }}"{% endif %},
+      "tls": {
+        "enabled": {{ vpn_outbound_common.tls.enabled | lower }},
+        "insecure": {{ vpn_outbound_common.tls.insecure | lower }},
+        "server_name": "{{ vpn_outbound_common.tls.server_name }}",
+        "disable_sni": {{ vpn_outbound_common.tls.disable_sni | lower }},
+        "utls": {
+          "enabled": {{ vpn_outbound_common.utls.enabled | lower }},
+          "fingerprint": "{{ vpn_outbound_common.utls.fingerprint }}"
+        },
+        "reality": {
+          "enabled": {{ vpn_outbound_common.reality.enabled | lower }}{% if vpn_outbound_common.reality.enabled %},
+          "public_key": "{{ server.public_key }}",
+          "short_id": "{{ server.short_id }}"{% endif %}
+
+        }
+      }
+    }{% if vpn_ipv6_enabled and server.server_ipv6 %},
+    {
+      "tag": "{{ server.name }}-v6",
+      "type": "{{ vpn_outbound_common.type }}",
+      "server": "{{ server.server_ipv6 }}",
+      "server_port": {{ vpn_outbound_common.server_port }},
+      "uuid": "{{ server.uuid }}"{% if vpn_outbound_common.flow %},
+      "flow": "{{ vpn_outbound_common.flow }}"{% endif %},
+      "tls": {
+        "enabled": {{ vpn_outbound_common.tls.enabled | lower }},
+        "insecure": {{ vpn_outbound_common.tls.insecure | lower }},
+        "server_name": "{{ vpn_outbound_common.tls.server_name }}",
+        "disable_sni": {{ vpn_outbound_common.tls.disable_sni | lower }},
+        "utls": {
+          "enabled": {{ vpn_outbound_common.utls.enabled | lower }},
+          "fingerprint": "{{ vpn_outbound_common.utls.fingerprint }}"
+        },
+        "reality": {
+          "enabled": {{ vpn_outbound_common.reality.enabled | lower }}{% if vpn_outbound_common.reality.enabled %},
+          "public_key": "{{ server.public_key }}",
+          "short_id": "{{ server.short_id }}"{% endif %}
+
+        }
+      }
+    }{% endif %}{% if not loop.last %},{% endif %}
+
+{% endfor %}
+  ],
+  "route": {
+    "default_domain_resolver": "{{ vpn_dns_servers[-1].tag }}",
+    "final": "{{ vpn_outbound_common.tag }}",
+    "auto_detect_interface": true
+  }
+}

@@ -1,0 +1,52 @@
+---
+# VPN Server Role - x-ui configuration
+
+- name: Ensure sqlite3 is installed
+  ansible.builtin.apt:
+    name: sqlite3
+    state: present
+    update_cache: true
+  tags: [x-ui, x-ui-config]
+
+- name: Configure x-ui - set panel domain
+  ansible.builtin.shell:
+    cmd: |
+      sqlite3 /etc/x-ui/x-ui.db "DELETE FROM settings WHERE key='webDomain';"
+      sqlite3 /etc/x-ui/x-ui.db "INSERT INTO settings (key, value) VALUES ('webDomain', '{{ vpn_server_domain }}');"
+  changed_when: true
+  notify: restart x-ui
+  when: vpn_server_domain is defined
+  tags: [x-ui, x-ui-config]
+
+- name: Configure x-ui - set certificate path
+  ansible.builtin.shell:
+    cmd: |
+      sqlite3 /etc/x-ui/x-ui.db "DELETE FROM settings WHERE key='webCertFile';"
+      sqlite3 /etc/x-ui/x-ui.db "INSERT INTO settings (key, value) VALUES ('webCertFile', '{{ vpn_server_xui_cert_path }}');"
+  changed_when: true
+  notify: restart x-ui
+  tags: [x-ui, x-ui-config]
+
+- name: Configure x-ui - set private key path
+  ansible.builtin.shell:
+    cmd: |
+      sqlite3 /etc/x-ui/x-ui.db "DELETE FROM settings WHERE key='webKeyFile';"
+      sqlite3 /etc/x-ui/x-ui.db "INSERT INTO settings (key, value) VALUES ('webKeyFile', '{{ vpn_server_xui_key_path }}');"
+  changed_when: true
+  notify: restart x-ui
+  tags: [x-ui, x-ui-config]
+
+- name: Configure x-ui - disable subscription
+  ansible.builtin.shell:
+    cmd: |
+      sqlite3 /etc/x-ui/x-ui.db "DELETE FROM settings WHERE key='subEnable';"
+      sqlite3 /etc/x-ui/x-ui.db "INSERT INTO settings (key, value) VALUES ('subEnable', 'false');"
+  changed_when: true
+  notify: restart x-ui
+  tags: [x-ui, x-ui-config]
+
+- name: Remove old private.key file if exists
+  ansible.builtin.file:
+    path: /etc/x-ui/private.key
+    state: absent
+  tags: [x-ui, x-ui-config]

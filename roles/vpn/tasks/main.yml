@@ -1,0 +1,107 @@
+---
+# VPN Role - Main tasks
+# Tags: server, local
+
+# Client tasks - build vpn_servers list (для local/router)
+- name: Initialize vpn_servers
+  ansible.builtin.set_fact:
+    vpn_servers: []
+  when:
+    - vpn_servers is not defined or vpn_servers | length == 0
+    - "'server' not in ansible_run_tags"
+  tags: [local]
+
+- name: Build vpn_servers from vault
+  ansible.builtin.set_fact:
+    vpn_servers: >-
+      {{ vpn_servers + [{
+        'name': item.name,
+        'server_ipv4': item.server_ipv4,
+        'server_ipv6': item.server_ipv6 | default(''),
+        'public_key': item.public_key,
+        'short_id': item.short_id,
+        'uuid': item.clients[vpn_client_name]
+      }] }}
+  loop: "{{ vault_vpn_servers }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - vpn_servers | length < vault_vpn_servers | length
+    - "'server' not in ansible_run_tags"
+  tags: [local]
+
+- name: Validate VPN servers configured
+  ansible.builtin.assert:
+    that:
+      - vpn_servers | length > 0
+    fail_msg: "VPN servers not configured. Check vault_vpn_servers and vpn_client_name."
+  when: "'server' not in ansible_run_tags"
+  tags: [local]
+
+# Server tasks (VPS with x-ui)
+- name: Import security tasks
+  ansible.builtin.include_tasks: server/security.yml
+  when: "'server' in ansible_run_tags"
+  tags: [server, security]
+
+- name: Import certificate tasks
+  ansible.builtin.include_tasks: server/certificates.yml
+  when: "'server' in ansible_run_tags"
+  tags: [server, certificates]
+
+- name: Import x-ui tasks
+  ansible.builtin.include_tasks: server/x-ui.yml
+  when: "'server' in ansible_run_tags"
+  tags: [server, x-ui]
+
+# Local tasks (macOS sing-box client)
+- name: Check Homebrew installed
+  ansible.builtin.stat:
+    path: /opt/homebrew/bin/brew
+  register: _homebrew_check
+  when: ansible_facts['system'] == 'Darwin'
+  tags: [local]
+
+- name: Fail if Homebrew not installed
+  ansible.builtin.fail:
+    msg: 'Homebrew not installed. Run: /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+  when:
+    - ansible_facts['system'] == 'Darwin'
+    - not _homebrew_check.stat.exists
+  tags: [local]
+
+- name: Create config directory
+  ansible.builtin.file:
+    path: "{{ vpn_local_config_dir }}"
+    state: directory
+    mode: "0755"
+  when: ansible_facts['system'] == 'Darwin'
+  tags: [local]
+
+- name: Import domain tasks
+  ansible.builtin.include_tasks: local/domains.yml
+  when: ansible_facts['system'] == 'Darwin'
+  tags: [local]
+
+- name: Import PAC tasks
+  ansible.builtin.include_tasks: local/pac.yml
+  when:
+    - ansible_facts['system'] == 'Darwin'
+    - vpn_local_pac_enabled | default(true)
+  tags: [local]
+
+- name: Import config tasks
+  ansible.builtin.include_tasks: local/config.yml
+  when: ansible_facts['system'] == 'Darwin'
+  tags: [local]
+
+- name: Import cleanup tasks
+  ansible.builtin.include_tasks: local/cleanup.yml
+  when: ansible_facts['system'] == 'Darwin'
+  tags: [local]
+
+- name: Show config path
+  ansible.builtin.debug:
+    msg: "Config: {{ vpn_local_config_dir }} | PAC domains: {{ pac_domains | default([]) | length }} | Servers: {{ vpn_servers | map(attribute='name') | join(', ') }}"
+  when: ansible_facts['system'] == 'Darwin'
+  tags: [local]
