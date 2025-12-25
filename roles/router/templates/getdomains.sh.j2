@@ -47,6 +47,10 @@ start () {
     sed -i '/^#/d' /etc/dnsmasq.d/domains.lst
     sed -i '/^$/d' /etc/dnsmasq.d/domains.lst
     
+    # Копируем файлы в /tmp/dnsmasq.d/ откуда их читает dnsmasq
+    mkdir -p /tmp/dnsmasq.d
+    cp -f /etc/dnsmasq.d/*.lst /tmp/dnsmasq.d/ 2>/dev/null || true
+    
     # Перезапускаем dnsmasq
     /etc/init.d/dnsmasq restart
 }
